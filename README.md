@@ -17,7 +17,8 @@ python setup.py install # This may take a while
 cd ../../..
 
 # Download the PointNet++ weights pretrained on the VIL3DRef dataset
-wget https://huggingface.co/datasets/huangjy-pku/LEO_data/resolve/main/pointnetpp_vil3dref.pth -O embodied-generalist/pointnetpp_vil3dref.pth
+wget https://huggingface.co/datasets/huangjy-pku/LEO_data/resolve/main/pointnetpp_vil3dref.pth \
+-O embodied-generalist/pointnetpp_vil3dref.pth
 
 # Download the 3D-GRAND dataset with global alignment
 wget https://huggingface.co/datasets/huangjy-pku/LEO_data/resolve/main/pcd_with_global_alignment.zip
@@ -26,7 +27,8 @@ rm pcd_with_global_alignment.zip
 
 # Download pretrained LEO weights
 mkdir -p embodied-generalist/sft_noact
-wget https://huggingface.co/datasets/huangjy-pku/LEO_data/resolve/main/sft_noact.pth -O embodied-generalist/sft_noact/pytorch_model.bin
+wget https://huggingface.co/datasets/huangjy-pku/LEO_data/resolve/main/sft_noact.pth \
+-O embodied-generalist/sft_noact/pytorch_model.bin
 ```
 
 After this, make the following code modifications to fix compatibility issues:
