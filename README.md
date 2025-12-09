@@ -45,10 +45,16 @@ python eval_leo.py <PATH_TO_3D_POPE_JSON_FILE>
 
 This will generate evaluation results and save them to a file named `results.json` under `eval_results/<3D_POPE_JSON_FILE>/probe/`.
 
+After obtaining the `results.json` file, you can calculate the evaluation metrics using the provided `calculate_metrics.py` script:
+
+```bash
+python calculate_metrics.py --results <generated_results.json> --gt <dataset_ground_truth.json>
+```
+
 ## TODO
 - [x] Inference LEO
 - [x] Create the inference pipeline for 3D-POPE
-- [ ] Calculate the score from the results.json file
+- [x] Calculate the score from the results.json file
 - [ ] Test the effect of removing `<image>` tag from the prompt
 - [ ] Inference other 3D-LLMs (e.g., LION, 3D-ChatGPT, etc.)
 
