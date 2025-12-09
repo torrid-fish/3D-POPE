@@ -1,6 +1,6 @@
 #!/bin/bash
 
-TRAINED_MODEL="./sft_noact/"
+TRAINED_MODEL="sft_noact"
 SCENE_IDS=("scene0011_00" "scene0011_00")
 INSTRUCTIONS=("Describe this scene." "Is there a chair in this scene?")
 EVAL_NOTE="test"
@@ -23,14 +23,17 @@ HYDRA_FULL_ERROR=1 python launch.py \
     --mode python \
     --run_file inference.py \
     --config configs/default.yaml \
+    name="LEO-${TRAINED_MODEL}"\
     note=${EVAL_NOTE} \
     pretrained_ckpt_path=${TRAINED_MODEL} \
     data.scan_family_base="../" \
-    exp_dir="../eval_results/" \
+    base_dir="../eval_results/" \
     llm.cfg_path="lmsys/vicuna-7b-v1.1" \
     vision3d.backbone.path="./pointnetpp_vil3dref.pth" \
     probe.sources=[\"scannet\"] \
     probe.scene_ids=[${SCENE_IDS_STR}] \
-    probe.instructions=[${INSTRUCTIONS_STR}]
+    probe.instructions=[${INSTRUCTIONS_STR}] \
+    probe.save_obj_tokens=false \
+    dataloader.eval.batchsize=1
 
 cd ..
