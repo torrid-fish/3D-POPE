@@ -31,10 +31,8 @@ wget https://huggingface.co/datasets/huangjy-pku/LEO_data/resolve/main/sft_noact
 
 After this, make the following code modifications to fix compatibility issues:
 1. Replace `from torch._six import string_classes` in [`embodied-generalist/common/misc.py`](embodied-generalist/common/misc.py) with `string_classes = str`. (related [issue](https://github.com/NVIDIA/apex/issues/1724#issuecomment-1846627576))
-2. Comment out the imports of `PointNext` and `PointBERT` in [`embodied-generalist/model/pcd_backbone.py`](embodied-generalist/model/pcd_backbone.py).
-3. Add 'lmsys/vicuna-7b-v1.1' to [`embodied-generalist/configs/llm/vicuna7b.yaml`](embodied-generalist/configs/llm/vicuna7b.yaml) in line 2. (They use v1.1 as backbone llm)
-4. Add './pointnetpp_vil3dref.pth' to [`embodied-generalist/configs/vision3d/backbone/pointnetpp.yaml`](embodied-generalist/configs/vision3d/backbone/pointnetpp.yaml) in line 8.
-5. Add `weights_only=False` to [`embodied-generalist/data/datasets.py`](embodied-generalist/data/datasets.py) in line 111.
+2. Comment out the imports of `PointNext` and `PointBERT` in [`embodied-generalist/model/pcd_backbone.py`](embodied-generalist/model/pcd_backbone.py) (Line 10 and 11).
+3. Add `weights_only=False` to [`embodied-generalist/data/datasets.py`](embodied-generalist/data/datasets.py) in line 111.
 
 ## About the 3D-POPE Benchmark
 
