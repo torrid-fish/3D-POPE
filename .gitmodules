@@ -1,0 +1,3 @@
+[submodule "embodied-generalist"]
+	path = embodied-generalist
+	url = https://github.com/embodied-generalist/embodied-generalist.git
