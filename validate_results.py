@@ -99,71 +99,133 @@ def calculate_metrics(ground_truth_file, results_file):
 
 def main():
     results_dir = "eval_results"
-    gt_base_dir = "scannet_scannet200"
     output_csv = "validation_summary.csv"
     
-    # Pattern to match the result files
-    # leo-sft_noact_scannet200_{type}_{template}.json
-    pattern = os.path.join(results_dir, "leo-sft_noact_scannet200_*.json")
-    files = glob.glob(pattern)
-    files.sort()
+    configs = [
+        {
+            "dataset": "scannet200",
+            "gt_dir": "scannet_scannet200",
+            "pattern": os.path.join(results_dir, "leo-sft_noact_scannet200_*.json"),
+            "regex": r"leo-sft_noact_scannet200_(.+?)_(template_\d+)\.json",
+            "is_nested": False
+        },
+        {
+            "dataset": "nyu40",
+            "gt_dir": "scannet_nyu40",
+            "pattern": os.path.join(results_dir, "leo-sft_noact_nyu40_*.json"),
+            "regex": r"leo-sft_noact_nyu40_(.+?)_(template_\d+)\.json",
+            "is_nested": False
+        }
+    ]
     
     summary_data = []
     
-    print(f"Found {len(files)} result files.")
-    
-    for result_file in files:
-        filename = os.path.basename(result_file)
+    for config in configs:
+        print(f"Processing dataset: {config['dataset']}")
+        files = glob.glob(config['pattern'])
+        files.sort()
         
-        # Extract type and template using regex
-        # Expected format: leo-sft_noact_scannet200_(adversarial|popular|random)_(template_\d+).json
-        match = re.search(r"leo-sft_noact_scannet200_(.+?)_(template_\d+)\.json", filename)
+        print(f"Found {len(files)} result files for {config['dataset']}.")
         
-        if match:
-            q_type = match.group(1)
-            template = match.group(2)
+        for result_file in files:
+            # For nested files, we match against the relative path from results_dir
+            rel_path = os.path.relpath(result_file, results_dir)
             
-            gt_filename = f"{q_type}_{template}.json"
-            gt_path = os.path.join(gt_base_dir, gt_filename)
+            match = re.search(config['regex'], rel_path)
             
-            print(f"Processing {filename}...")
-            print(f"  GT: {gt_path}")
+            # Special check for nyu40 to avoid matching scannet200 files if regex is too broad
+            # But here scannet200 files are flat, nyu40 are nested, so pattern handles it.
+            # However, regex for nyu40 might match scannet200 if not careful?
+            # nyu40 regex expects folder structure.
             
-            metrics = calculate_metrics(gt_path, result_file)
-            
-            if metrics:
-                row = {
-                    "File": filename,
-                    "Type": q_type,
-                    "Template": template,
-                    **metrics
-                }
-                summary_data.append(row)
-            else:
-                print("  Failed to calculate metrics.")
-        else:
-            print(f"Skipping file {filename} (does not match pattern)")
+            if match:
+                q_type = match.group(1)
+                template = match.group(2)
+                
+                # Skip if q_type contains "scannet200" (just in case of overlap, though pattern should prevent it)
+                if "scannet200" in q_type:
+                    continue
 
-    # Calculate averages per type
-    type_metrics = {}
+                gt_filename = f"{q_type}_{template}.json"
+                gt_path = os.path.join(config['gt_dir'], gt_filename)
+                
+                print(f"Processing {rel_path}...")
+                print(f"  GT: {gt_path}")
+                
+                metrics = calculate_metrics(gt_path, result_file)
+                
+                if metrics:
+                    row = {
+                        "Dataset": config['dataset'],
+                        "File": rel_path,
+                        "Type": q_type,
+                        "Template": template,
+                        **metrics
+                    }
+                    summary_data.append(row)
+                else:
+                    print("  Failed to calculate metrics.")
+            else:
+                # print(f"Skipping file {rel_path} (does not match regex)")
+                pass
+
+    # Calculate averages per dataset and type
+    # Key: (dataset, type)
+    group_metrics = {}
     
     for row in summary_data:
-        q_type = row['Type']
-        if q_type not in type_metrics:
-            type_metrics[q_type] = {
+        key = (row['Dataset'], row['Type'])
+        if key not in group_metrics:
+            group_metrics[key] = {
                 "Accuracy": [], "Precision": [], "Recall": [], "F1 Score": [], "Yes (%)": []
             }
         
-        type_metrics[q_type]["Accuracy"].append(row["Accuracy"])
-        type_metrics[q_type]["Precision"].append(row["Precision"])
-        type_metrics[q_type]["Recall"].append(row["Recall"])
-        type_metrics[q_type]["F1 Score"].append(row["F1 Score"])
-        type_metrics[q_type]["Yes (%)"].append(row["Yes (%)"])
+        group_metrics[key]["Accuracy"].append(row["Accuracy"])
+        group_metrics[key]["Precision"].append(row["Precision"])
+        group_metrics[key]["Recall"].append(row["Recall"])
+        group_metrics[key]["F1 Score"].append(row["F1 Score"])
+        group_metrics[key]["Yes (%)"].append(row["Yes (%)"])
 
     # Add average rows
-    for q_type, metrics in type_metrics.items():
+    for (dataset, q_type), metrics in group_metrics.items():
         avg_row = {
-            "File": f"AVERAGE_{q_type}",
+            "Dataset": dataset,
+            "File": f"AVERAGE_{dataset}_{q_type}",
+            "Type": q_type,
+            "Template": "AVERAGE",
+            "Accuracy": sum(metrics["Accuracy"]) / len(metrics["Accuracy"]),
+            "Precision": sum(metrics["Precision"]) / len(metrics["Precision"]),
+            "Recall": sum(metrics["Recall"]) / len(metrics["Recall"]),
+            "F1 Score": sum(metrics["F1 Score"]) / len(metrics["F1 Score"]),
+            "Yes (%)": sum(metrics["Yes (%)"]) / len(metrics["Yes (%)"])
+        }
+        summary_data.append(avg_row)
+
+    # Calculate global averages per type (across datasets)
+    global_type_metrics = {}
+    
+    for row in summary_data:
+        # Skip existing average rows
+        if row['Template'] == 'AVERAGE':
+            continue
+            
+        q_type = row['Type']
+        if q_type not in global_type_metrics:
+            global_type_metrics[q_type] = {
+                "Accuracy": [], "Precision": [], "Recall": [], "F1 Score": [], "Yes (%)": []
+            }
+        
+        global_type_metrics[q_type]["Accuracy"].append(row["Accuracy"])
+        global_type_metrics[q_type]["Precision"].append(row["Precision"])
+        global_type_metrics[q_type]["Recall"].append(row["Recall"])
+        global_type_metrics[q_type]["F1 Score"].append(row["F1 Score"])
+        global_type_metrics[q_type]["Yes (%)"].append(row["Yes (%)"])
+
+    # Add global average rows
+    for q_type, metrics in global_type_metrics.items():
+        avg_row = {
+            "Dataset": "ALL",
+            "File": f"AVERAGE_ALL_{q_type}",
             "Type": q_type,
             "Template": "AVERAGE",
             "Accuracy": sum(metrics["Accuracy"]) / len(metrics["Accuracy"]),
@@ -176,11 +238,14 @@ def main():
 
     # Sort data
     type_order = {'random': 0, 'popular': 1, 'adversarial': 2}
+    dataset_order = {'scannet200': 0, 'nyu40': 1, 'ALL': 2}
     
     def get_sort_key(row):
+        d_dataset = row['Dataset']
         t_type = row['Type']
         t_template = row['Template']
         
+        dataset_rank = dataset_order.get(d_dataset, 99)
         type_rank = type_order.get(t_type, 99)
         
         if t_template == 'AVERAGE':
@@ -193,13 +258,13 @@ def main():
             else:
                 template_rank = 0
         
-        return (type_rank, template_rank)
+        return (dataset_rank, type_rank, template_rank)
 
     summary_data.sort(key=get_sort_key)
 
     if summary_data:
         # Reorder columns
-        cols = ["File", "Type", "Template", "Precision", "Recall", "F1 Score", "Accuracy", "Yes (%)"]
+        cols = ["Dataset", "File", "Type", "Template", "Precision", "Recall", "F1 Score", "Accuracy", "Yes (%)"]
         
         with open(output_csv, 'w', newline='') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=cols)
@@ -209,11 +274,11 @@ def main():
                 
         print(f"\nSummary saved to {output_csv}")
         # Print a simple table
-        header = f"{'File':<55} {'Type':<15} {'Template':<15} {'Prec':<10} {'Rec':<10} {'F1':<10} {'Acc':<10} {'Yes%':<10}"
+        header = f"{'Dataset':<12} {'Type':<15} {'Template':<15} {'Prec':<10} {'Rec':<10} {'F1':<10} {'Acc':<10} {'Yes%':<10}"
         print(header)
         print("-" * len(header))
         for row in summary_data:
-            print(f"{row['File']:<55} {row['Type']:<15} {row['Template']:<15} {row['Precision']:.4f}     {row['Recall']:.4f}     {row['F1 Score']:.4f}     {row['Accuracy']:.4f}     {row['Yes (%)']:.2f}")
+            print(f"{row['Dataset']:<12} {row['Type']:<15} {row['Template']:<15} {row['Precision']:.4f}     {row['Recall']:.4f}     {row['F1 Score']:.4f}     {row['Accuracy']:.4f}     {row['Yes (%)']:.2f}")
     else:
         print("No data to summarize.")
 
